@@ -130,7 +130,7 @@ function expect(status, result, extraErrorMessage) {
 }
 
 //Uploads zip file, creates new version and deploys it
-function deployNewVersion(application, environmentName, versionLabel, versionDescription, file, waitUntilDeploymentIsFinished, waitForRecoverySeconds) {
+function deployNewVersion(application, environmentName, versionLabel, versionDescription, file, waitUntilDeploymentIsFinished, waitForRecoverySeconds, useExistingVersionIfAvailable) {
 
     let s3Key = `/${application}/${versionLabel}.zip`;
     let bucket, deployStart, fileBuffer;
@@ -145,6 +145,10 @@ function deployNewVersion(application, environmentName, versionLabel, versionDes
         return checkIfFileExistsInS3(bucket, s3Key);
     }).then(result => {
         if (result.statusCode === 200) {
+            if (useExistingVersionIfAvailable) {
+                console.log(`Using existing application file from bucket ${bucket}`);
+                return createBeanstalkVersion(application, bucket, s3Key, versionLabel, versionDescription);
+            }
             throw new Error(`Version ${versionLabel} already exists in S3!`);
         }
         expect(404, result); 
@@ -330,15 +334,15 @@ function main() {
                 console.log(`Deploying existing version ${versionLabel}, version info:`);
                 console.log(JSON.stringify(versionsList[0], null, 2));
                 deployExistingVersion(application, environmentName, versionLabel, waitUntilDeploymentIsFinished, waitForRecoverySeconds);
-            } 
+            }
         } else {
             if (file) {
-                deployNewVersion(application, environmentName, versionLabel, versionDescription, file, waitUntilDeploymentIsFinished, waitForRecoverySeconds);
+                deployNewVersion(application, environmentName, versionLabel, versionDescription, file, waitUntilDeploymentIsFinished, waitForRecoverySeconds, useExistingVersionIfAvailable);
             } else {
                 console.error(`Deployment failed: No deployment package given but version ${versionLabel} doesn't exist, so nothing to deploy!`);
                 process.exit(2);
-            } 
-        } 
+            }
+        }
     }).catch(err => {
         console.error(`Deployment failed: ${err}`);
         process.exit(2);
